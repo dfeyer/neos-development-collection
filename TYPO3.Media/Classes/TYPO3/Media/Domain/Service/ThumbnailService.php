@@ -12,6 +12,7 @@ namespace TYPO3\Media\Domain\Service;
  *                                                                        */
 
 use TYPO3\Flow\Annotations as Flow;
+use TYPO3\Flow\Exception;
 use TYPO3\Flow\Log\SystemLoggerInterface;
 use TYPO3\Flow\Persistence\PersistenceManagerInterface;
 use TYPO3\Flow\SignalSlot\Dispatcher;
@@ -76,21 +77,26 @@ class ThumbnailService {
 	 * @param AssetInterface $asset The asset to render a thumbnail for
 	 * @param ThumbailConfiguration $configuration
 	 * @return Thumbnail
-	 * @throws \Exception
 	 */
 	public function getThumbnail(AssetInterface $asset, ThumbailConfiguration $configuration) {
 		$thumbnail = $this->thumbnailRepository->findOneByAssetAndThumbnailConfiguration($asset, $configuration);
 		if ($thumbnail === NULL) {
-			if (!$asset instanceof ImageInterface) {
-				throw new NoThumbnailAvailableException(sprintf('ThumbnailService could not generate a thumbnail for asset of type "%s" because currently only Image assets are supported.', get_class($asset)), 1381493670);
-			}
-			$thumbnail = new Thumbnail($asset, $configuration);
+			try {
+				$thumbnail = new Thumbnail($asset, $configuration);
 
-			// Allow thumbnails to be persisted even if this is a "safe" HTTP request:
-			$this->thumbnailRepository->add($thumbnail);
-			$asset->addThumbnail($thumbnail);
-			$this->persistenceManager->whiteListObject($thumbnail);
-			$this->persistenceManager->whiteListObject($thumbnail->getResource());
+				// If the thumbnail strategy failed to generate a valid thumbnail
+				if ($thumbnail->getResource() === NULL) {
+					return NULL;
+				}
+
+				$this->thumbnailRepository->add($thumbnail);
+				$asset->addThumbnail($thumbnail);
+				$this->persistenceManager->whiteListObject($thumbnail);
+				$this->persistenceManager->whiteListObject($thumbnail->getResource());
+			} catch (NoThumbnailAvailableException $exception) {
+				$this->systemLogger->logException($exception);
+				return NULL;
+			}
 		}
 
 		return $thumbnail;
