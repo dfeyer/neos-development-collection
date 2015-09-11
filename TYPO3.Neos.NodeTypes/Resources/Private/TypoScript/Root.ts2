@@ -41,9 +41,11 @@ prototype(TYPO3.Neos.NodeTypes:Menu) {
 # Image TS Object
 prototype(TYPO3.Neos.NodeTypes:Image) {
 	maximumWidth = 2560
+	width = NULL
 	maximumHeight = 2560
+	height = NULL
 	imageClassName = ${q(node).property('alignment') ? ('typo3-neos-alignment-' + q(node).property('alignment')) : ''}
-	allowCropping = FALSE
+	allowCropping = NULL
 	allowUpScaling = FALSE
 	link.@process.convertUris = TYPO3.Neos:ConvertUris {
 		forceConversion = true
