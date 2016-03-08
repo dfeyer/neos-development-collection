@@ -52,6 +52,22 @@
                             </tr>
                         </table>
                     </f:if>
+                    <f:if condition="{contentChanges.type} == 'references'">
+                        <table>
+                            <tr>
+                                <td>
+                                    <f:for each="{contentChanges.original}" as="line">
+                                        <div>{line -> f:format.raw()}</div>
+                                    </f:for>
+                                </td>
+                                <td>
+                                    <f:for each="{contentChanges.changed}" as="line">
+                                        <div>{line -> f:format.raw()}</div>
+                                    </f:for>
+                                </td>
+                            </tr>
+                        </table>
+                    </f:if>
                     <f:if condition="{contentChanges.type} == 'datetime'">
                         <table>
                             <tr>

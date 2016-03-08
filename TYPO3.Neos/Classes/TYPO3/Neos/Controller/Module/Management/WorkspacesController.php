@@ -536,13 +536,20 @@ class WorkspacesController extends AbstractModuleController
                 continue;
             }
 
-            $originalPropertyValue = ($originalNode === null ? null : $originalNode->getProperty($propertyName));
 
+            $originalPropertyValue = ($originalNode === null ? null : $originalNode->getProperty($propertyName));
             if ($changedPropertyValue === $originalPropertyValue && !$changedNode->isRemoved()) {
                 continue;
             }
-
-            if (!is_object($originalPropertyValue) && !is_object($changedPropertyValue)) {
+            $propertyType = $changedNode->getNodeType()->getPropertyType($propertyName);
+            if ($propertyType === 'references') {
+                $contentChanges[$propertyName] = [
+                    'type' => 'references',
+                    'propertyLabel' => $this->getPropertyLabel($propertyName, $changedNode),
+                    'original' => array_map(function(NodeInterface $node) {return $node->getLabel();}, $originalPropertyValue ?: []),
+                    'changed' => array_map(function(NodeInterface $node) {return $node->getLabel();}, $changedPropertyValue ?: [])
+                ];
+            } elseif (!is_object($originalPropertyValue) && !is_object($changedPropertyValue)) {
                 $originalSlimmedDownContent = $this->renderSlimmedDownContent($originalPropertyValue);
                 $changedSlimmedDownContent = $changedNode->isRemoved() ? '' : $this->renderSlimmedDownContent($changedPropertyValue);
 
