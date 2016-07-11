@@ -79,11 +79,15 @@ class ExpressionBasedNodeLabelGenerator implements NodeLabelGeneratorInterface
             $parentNode = $node->getParent();
             $property = 'childNodes.' . $node->getName() . '.label';
             if ($parentNode->getNodeType()->hasConfiguration($property)) {
-                $expression = $parentNode->getNodeType()->getConfiguration($property);
-                $label = Utility::evaluateEelExpression($expression, $this->eelEvaluator, [
-                    'node' => $node,
-                    'parentNode' => $parentNode
-                ], $this->defaultContextConfiguration);
+                $labelConfiguration = $parentNode->getNodeType()->getConfiguration($property);
+                if (!Utility::extractEelExpression($labelConfiguration)) {
+                    $label = (string)$labelConfiguration;
+                } else {
+                    $label = Utility::evaluateEelExpression($labelConfiguration, $this->eelEvaluator, [
+                        'node' => $node,
+                        'parentNode' => $parentNode
+                    ], $this->defaultContextConfiguration);
+                }
             }
         }
         if ($label === null) {

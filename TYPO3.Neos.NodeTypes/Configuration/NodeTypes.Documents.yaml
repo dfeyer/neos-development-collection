@@ -3,7 +3,7 @@
     'TYPO3.Neos:Document': TRUE
   childNodes:
     main:
-      label: "${'Main Content Collection'}"
+      label: 'Main Content Collection'
       type: 'TYPO3.Neos:ContentCollection'
   properties:
     layout:

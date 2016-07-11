@@ -188,10 +188,10 @@
     position: 200
   childNodes:
     column0:
-      label: "${'Left Column'}"
+      label: 'Left Column'
       type: 'TYPO3.Neos:ContentCollection'
     column1:
-      label: "${'Right Column'}"
+      label: 'Right Column'
       type: 'TYPO3.Neos:ContentCollection'
   properties:
     layout:
@@ -220,13 +220,13 @@
     position: 300
   childNodes:
     column0:
-      label: "${'Left Column'}"
+      label: 'Left Column'
       type: 'TYPO3.Neos:ContentCollection'
     column1:
-      label: "${'Middle Column'}"
+      label: 'Middle Column'
       type: 'TYPO3.Neos:ContentCollection'
     column2:
-      label: "${'Right Column'}"
+      label: 'Right Column'
       type: 'TYPO3.Neos:ContentCollection'
   properties:
     layout:
@@ -253,16 +253,16 @@
     position: 400
   childNodes:
     column0:
-      label: "${'Left Column'}"
+      label: 'Left Column'
       type: 'TYPO3.Neos:ContentCollection'
     column1:
-      label: "${'Middle Left Column'}"
+      label: 'Middle Left Column'
       type: 'TYPO3.Neos:ContentCollection'
     column2:
-      label: "${'Middle Right Column'}"
+      label: 'Middle Right Column'
       type: 'TYPO3.Neos:ContentCollection'
     column2:
-      label: "${'Right Column'}"
+      label: 'Right Column'
       type: 'TYPO3.Neos:ContentCollection'
   properties:
     layout:
