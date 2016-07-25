@@ -10,6 +10,7 @@ namespace TYPO3\Neos\Tests\Unit\ViewHelpers;
  * information, please view the LICENSE file which was distributed with this
  * source code.
  */
+use TYPO3\Fluid\View\StandaloneView;
 
 /**
  * Testcase for the IncludeJavaScript view helper
@@ -34,7 +35,7 @@ class IncludeJavaScriptViewHelperTest extends \TYPO3\Flow\Tests\UnitTestCase
         $this->resourcePublisher = $this->getMockBuilder('TYPO3\Flow\Resource\Publishing\ResourcePublisher')->disableOriginalConstructor()->getMock();
         $this->resourcePublisher->expects($this->any())->method('getStaticResourcesWebBaseUri')->will($this->returnValue('StaticResourceUri/'));
         $this->viewHelper = $this->getAccessibleMock('TYPO3\Neos\ViewHelpers\IncludeJavaScriptViewHelper', array('iterateDirectoryRecursively'));
-        $renderingContext = new \TYPO3\Fluid\Core\Rendering\RenderingContext();
+        $renderingContext = new \TYPO3\Fluid\Core\Rendering\RenderingContext(new StandaloneView($this->request));
         $renderingContext->setControllerContext($this->controllerContext);
         $this->viewHelper->setRenderingContext($renderingContext);
         $this->viewHelper->_set('resourcePublisher', $this->resourcePublisher);
