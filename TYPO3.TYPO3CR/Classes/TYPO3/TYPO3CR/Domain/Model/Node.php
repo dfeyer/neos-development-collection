@@ -961,15 +961,15 @@ class Node implements NodeInterface, CacheAwareInterface, EventSourcedAggregateR
             return;
         }
 
-        $this->recordThat(new NodePropertyUpdated($propertyName, $value, $this->getProperty($propertyName, true)));
+        $this->recordThat(new NodePropertyChanged($propertyName, $value, $this->getProperty($propertyName, true)));
         $this->commit();
 
     }
 
     /**
-     * @param NodePropertyUpdated $event
+     * @param NodePropertyChanged $event
      */
-    protected function whenNodePropertyUpdated(NodePropertyUpdated $event)
+    protected function whenNodePropertyChanged(NodePropertyChanged $event)
     {
         $propertyName = $event->getPropertyName();
         $oldValue = $this->getProperty($propertyName);

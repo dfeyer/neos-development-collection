@@ -16,9 +16,9 @@ use TYPO3\Flow\Annotations as Flow;
 use TYPO3\TYPO3CR\Domain\Model\NodeType;
 
 /**
- * NodePropertyUpdated
+ * NodePropertyChanged
  */
-class NodePropertyUpdated implements EventInterface
+class NodePropertyChanged implements EventInterface
 {
     /**
      * @var string
