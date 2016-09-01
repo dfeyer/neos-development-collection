@@ -26,11 +26,15 @@ use TYPO3\TYPO3CR\Domain\Event\NodeMovedAfter;
 use TYPO3\TYPO3CR\Domain\Event\NodeMovedBefore;
 use TYPO3\TYPO3CR\Domain\Event\NodeMovedInto;
 use TYPO3\TYPO3CR\Domain\Event\NodeNameUpdated;
-use TYPO3\TYPO3CR\Domain\Event\NodePropertyUpdated;
+use TYPO3\TYPO3CR\Domain\Event\NodeNodeTypeChanged;
+use TYPO3\TYPO3CR\Domain\Event\NodePropertyChanged;
+use TYPO3\TYPO3CR\Domain\Event\NodePropertyRemoved;
 use TYPO3\TYPO3CR\Domain\Event\NodeRemoved;
 use TYPO3\TYPO3CR\Domain\Event\NodeRestored;
+use TYPO3\TYPO3CR\Domain\Event\NodeWorkspaceSwitched;
 use TYPO3\TYPO3CR\Domain\Factory\NodeFactory;
 use TYPO3\TYPO3CR\Domain\Repository\NodeDataRepository;
+use TYPO3\TYPO3CR\Domain\Repository\WorkspaceRepository;
 use TYPO3\TYPO3CR\Domain\Service\Context;
 use TYPO3\TYPO3CR\Domain\Service\EventStreamService;
 use TYPO3\TYPO3CR\Domain\Service\NodeServiceInterface;
@@ -106,6 +110,11 @@ class Node implements NodeInterface, CacheAwareInterface, EventSourcedAggregateR
      * @var NodeTypeManager
      */
     protected $nodeTypeManager;
+
+    /**
+     * @var WorkspaceRepository
+     */
+    protected $workspaceRepository;
 
     /**
      * @Flow\Inject
@@ -491,6 +500,16 @@ class Node implements NodeInterface, CacheAwareInterface, EventSourcedAggregateR
         if ($this->getWorkspace()->getName() === $workspace->getName()) {
             return;
         }
+        $this->recordThat(new NodeWorkspaceSwitched($workspace->getName(), $this->getWorkspace() ? $this->getWorkspace()->getName() : null));
+        $this->commit();
+    }
+
+    /**
+     * @param NodeWorkspaceSwitched $event
+     */
+    protected function whenNodeWorkspaceSwitched(NodeWorkspaceSwitched $event)
+    {
+        $workspace = $this->workspaceRepository->findByName($event->getWorkspace());
         $this->nodeData->setWorkspace($workspace);
         $this->context->getFirstLevelNodeCache()->flush();
         $this->emitNodeUpdated($this);
@@ -1065,7 +1084,17 @@ class Node implements NodeInterface, CacheAwareInterface, EventSourcedAggregateR
         if (!$this->hasProperty($propertyName)) {
             return;
         }
-        $this->nodeData->removeProperty($propertyName);
+        $this->recordThat(new NodePropertyRemoved($propertyName, $this->getProperty($propertyName, true)));
+        $this->commit();
+
+    }
+
+    /**
+     * @param NodePropertyRemoved $event
+     */
+    protected function whenNodePropertyRemoved(NodePropertyRemoved $event)
+    {
+        $this->nodeData->removeProperty($event->getPropertyName());
 
         $this->context->getFirstLevelNodeCache()->flush();
         $this->emitNodeUpdated($this);
@@ -1166,6 +1195,17 @@ class Node implements NodeInterface, CacheAwareInterface, EventSourcedAggregateR
         if ($this->getNodeType() === $nodeType) {
             return;
         }
+        $this->recordThat(new NodeNodeTypeChanged($nodeType->getName(), $this->getNodeType() ? $this->getNodeType()->getName() : null));
+        $this->commit();
+
+    }
+
+    /**
+     * @param NodeNodeTypeChanged $event
+     */
+    protected function whenNodeNodeTypeChanged(NodeNodeTypeChanged $event)
+    {
+        $nodeType = $this->nodeTypeManager->getNodeType($event->getNodeType());
         $this->nodeData->setNodeType($nodeType);
 
         $this->context->getFirstLevelNodeCache()->flush();
