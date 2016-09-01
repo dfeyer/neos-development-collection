@@ -26,7 +26,7 @@ class NodeCreated implements EventInterface
     protected $name;
 
     /**
-     * @var NodeType|null
+     * @var string|null
      */
     protected $nodeType;
 
@@ -38,10 +38,10 @@ class NodeCreated implements EventInterface
     /**
      * NodeCreated constructor.
      * @param string $name
-     * @param null|NodeType $nodeType
+     * @param null|string $nodeType
      * @param null|string $identifier
      */
-    public function __construct(string $name, NodeType $nodeType = null, string $identifier = null)
+    public function __construct(string $name, string $nodeType = null, string $identifier = null)
     {
         $this->name = $name;
         $this->nodeType = $nodeType;
@@ -57,7 +57,7 @@ class NodeCreated implements EventInterface
     }
 
     /**
-     * @return null|NodeType
+     * @return null|string
      */
     public function getNodeType()
     {

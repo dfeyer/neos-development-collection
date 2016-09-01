@@ -22,7 +22,6 @@ use TYPO3\TYPO3CR\Domain\Event\NodeCopiedAfter;
 use TYPO3\TYPO3CR\Domain\Event\NodeCopiedBefore;
 use TYPO3\TYPO3CR\Domain\Event\NodeCopiedInto;
 use TYPO3\TYPO3CR\Domain\Event\NodeCreated;
-use TYPO3\TYPO3CR\Domain\Event\AbstractNodeMoved;
 use TYPO3\TYPO3CR\Domain\Event\NodeMovedAfter;
 use TYPO3\TYPO3CR\Domain\Event\NodeMovedBefore;
 use TYPO3\TYPO3CR\Domain\Event\NodeMovedInto;
@@ -35,6 +34,7 @@ use TYPO3\TYPO3CR\Domain\Repository\NodeDataRepository;
 use TYPO3\TYPO3CR\Domain\Service\Context;
 use TYPO3\TYPO3CR\Domain\Service\EventStreamService;
 use TYPO3\TYPO3CR\Domain\Service\NodeServiceInterface;
+use TYPO3\TYPO3CR\Domain\Service\NodeTypeManager;
 use TYPO3\TYPO3CR\Domain\Utility\NodePaths;
 use TYPO3\TYPO3CR\Exception\NodeConstraintException;
 use TYPO3\TYPO3CR\Exception\NodeException;
@@ -100,6 +100,12 @@ class Node implements NodeInterface, CacheAwareInterface, EventSourcedAggregateR
      * @var NodeServiceInterface
      */
     protected $nodeService;
+
+    /**
+     * @Flow\Inject
+     * @var NodeTypeManager
+     */
+    protected $nodeTypeManager;
 
     /**
      * @Flow\Inject
@@ -1200,10 +1206,11 @@ class Node implements NodeInterface, CacheAwareInterface, EventSourcedAggregateR
      */
     protected function whenNodeCreated(NodeCreated $event)
     {
-        $this->emitBeforeNodeCreate($this, $event->getName(), $event->getNodeType(), $event->getIdentifier());
-        $newNode = $this->createSingleNode($event->getName(), $event->getNodeType(), $event->getIdentifier());
-        if ($event->getNodeType() !== null) {
-            foreach ($event->getNodeType()->getDefaultValuesForProperties() as $propertyName => $propertyValue) {
+        $nodeType = $event->getNodeType() ? $this->nodeTypeManager->getNodeType($event->getNodeType()) : null;
+        $this->emitBeforeNodeCreate($this, $event->getName(), $nodeType, $event->getIdentifier());
+        $newNode = $this->createSingleNode($event->getName(), $nodeType, $event->getIdentifier());
+        if ($nodeType !== null) {
+            foreach ($nodeType->getDefaultValuesForProperties() as $propertyName => $propertyValue) {
                 if (substr($propertyName, 0, 1) === '_') {
                     ObjectAccess::setProperty($newNode, substr($propertyName, 1), $propertyValue);
                 } else {
@@ -1211,7 +1218,7 @@ class Node implements NodeInterface, CacheAwareInterface, EventSourcedAggregateR
                 }
             }
 
-            foreach ($event->getNodeType()->getAutoCreatedChildNodes() as $childNodeName => $childNodeType) {
+            foreach ($nodeType->getAutoCreatedChildNodes() as $childNodeName => $childNodeType) {
                 $childNodeIdentifier = Utility::buildAutoCreatedChildNodeIdentifier($childNodeName, $newNode->getIdentifier());
                 $alreadyPresentChildNode = $newNode->getNode($childNodeName);
                 if ($alreadyPresentChildNode === null) {
