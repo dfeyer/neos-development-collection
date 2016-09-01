@@ -11,13 +11,29 @@ namespace TYPO3\TYPO3CR\Domain\Model;
  * source code.
  */
 
+use Neos\EventStore\Domain\EventSourcedAggregateRootInterface;
+use Neos\EventStore\Domain\EventSourcedAggregateRootTrait;
 use TYPO3\Flow\Annotations as Flow;
 use TYPO3\Flow\Cache\CacheAwareInterface;
 use TYPO3\Flow\Property\PropertyMapper;
 use TYPO3\Flow\Reflection\ObjectAccess;
+use TYPO3\Flow\Utility\Algorithms;
+use TYPO3\TYPO3CR\Domain\Event\NodeCopiedAfter;
+use TYPO3\TYPO3CR\Domain\Event\NodeCopiedBefore;
+use TYPO3\TYPO3CR\Domain\Event\NodeCopiedInto;
+use TYPO3\TYPO3CR\Domain\Event\NodeCreated;
+use TYPO3\TYPO3CR\Domain\Event\AbstractNodeMoved;
+use TYPO3\TYPO3CR\Domain\Event\NodeMovedAfter;
+use TYPO3\TYPO3CR\Domain\Event\NodeMovedBefore;
+use TYPO3\TYPO3CR\Domain\Event\NodeMovedInto;
+use TYPO3\TYPO3CR\Domain\Event\NodeNameUpdated;
+use TYPO3\TYPO3CR\Domain\Event\NodePropertyUpdated;
+use TYPO3\TYPO3CR\Domain\Event\NodeRemoved;
+use TYPO3\TYPO3CR\Domain\Event\NodeRestored;
 use TYPO3\TYPO3CR\Domain\Factory\NodeFactory;
 use TYPO3\TYPO3CR\Domain\Repository\NodeDataRepository;
 use TYPO3\TYPO3CR\Domain\Service\Context;
+use TYPO3\TYPO3CR\Domain\Service\EventStreamService;
 use TYPO3\TYPO3CR\Domain\Service\NodeServiceInterface;
 use TYPO3\TYPO3CR\Domain\Utility\NodePaths;
 use TYPO3\TYPO3CR\Exception\NodeConstraintException;
@@ -31,8 +47,10 @@ use TYPO3\TYPO3CR\Utility;
  * @Flow\Scope("prototype")
  * @api
  */
-class Node implements NodeInterface, CacheAwareInterface
+class Node implements NodeInterface, CacheAwareInterface, EventSourcedAggregateRootInterface
 {
+    use EventSourcedAggregateRootTrait;
+
     /**
      * The NodeData entity this version is for.
      *
@@ -84,6 +102,12 @@ class Node implements NodeInterface, CacheAwareInterface
     protected $nodeService;
 
     /**
+     * @Flow\Inject
+     * @var EventStreamService
+     */
+    protected $eventStreamService;
+
+    /**
      * @param NodeData $nodeData
      * @param Context $context
      * @Flow\Autowiring(false)
@@ -130,7 +154,16 @@ class Node implements NodeInterface, CacheAwareInterface
             throw new NodeException('The root node cannot be renamed.', 1346778388);
         }
 
-        $this->setPath(NodePaths::addNodePathSegment($this->getParentPath(), $newName));
+        $this->recordThat(new NodeNameUpdated($newName, $this->getName()));
+        $this->commit();
+    }
+
+    /**
+     * @param NodeNameUpdated $event
+     */
+    protected function handleNodeNameUpdated(NodeNameUpdated $event)
+    {
+        $this->setPath(NodePaths::addNodePathSegment($this->getParentPath(), $event->getName()));
         $this->nodeDataRepository->persistEntities();
         $this->context->getFirstLevelNodeCache()->flush();
         $this->emitNodeUpdated($this);
@@ -573,6 +606,17 @@ class Node implements NodeInterface, CacheAwareInterface
             throw new NodeConstraintException('Cannot move ' . $this->__toString() . ' before ' . $referenceNode->__toString(), 1400782413);
         }
 
+        $this->recordThat(new NodeMovedBefore($referenceNode->getIdentifier(), $newName));
+        $this->commit();
+    }
+
+    /**
+     * @param NodeMovedBefore $event
+     */
+    protected function whenNodeMovedBefore(NodeMovedBefore $event)
+    {
+        $referenceNode = $this->context->getNodeByIdentifier($event->getReferenceNode());
+        $newName = $event->getNewName();
         $name = $newName !== null ? $newName : $this->getName();
         $this->emitBeforeNodeMove($this, $referenceNode, NodeDataRepository::POSITION_BEFORE);
         if ($referenceNode->getParentPath() !== $this->getParentPath()) {
@@ -618,6 +662,18 @@ class Node implements NodeInterface, CacheAwareInterface
             throw new NodeConstraintException('Cannot move ' . $this->__toString() . ' after ' . $referenceNode->__toString(), 1404648100);
         }
 
+        $this->recordThat(new NodeMovedAfter($referenceNode->getIdentifier(), $newName));
+        $this->commit();
+    }
+
+    /**
+     * @param NodeMovedInto $event
+     */
+    protected function whenNodeMovedAfter(NodeMovedAfter $event)
+    {
+        $referenceNode = $this->context->getNodeByIdentifier($event->getReferenceNode());
+        $newName = $event->getNewName();
+
         $name = $newName !== null ? $newName : $this->getName();
         $this->emitBeforeNodeMove($this, $referenceNode, NodeDataRepository::POSITION_AFTER);
         if ($referenceNode->getParentPath() !== $this->getParentPath()) {
@@ -634,6 +690,7 @@ class Node implements NodeInterface, CacheAwareInterface
         $this->emitAfterNodeMove($this, $referenceNode, NodeDataRepository::POSITION_AFTER);
         $this->emitNodeUpdated($this);
     }
+
 
     /**
      * Moves this node into the given node
@@ -662,6 +719,18 @@ class Node implements NodeInterface, CacheAwareInterface
         if (!$referenceNode->willChildNodeBeAutoCreated($this->getName()) && !$referenceNode->isNodeTypeAllowedAsChildNode($this->getNodeType())) {
             throw new NodeConstraintException('Cannot move ' . $this->__toString() . ' into ' . $referenceNode->__toString(), 1404648124);
         }
+
+        $this->recordThat(new NodeMovedInto($referenceNode->getIdentifier(), $newName));
+        $this->commit();
+    }
+
+    /**
+     * @param NodeMovedInto $event
+     */
+    protected function whenNodeMovedInto(NodeMovedInto $event)
+    {
+        $referenceNode = $this->context->getNodeByIdentifier($event->getReferenceNode());
+        $newName = $event->getNewName();
 
         $name = $newName !== null ? $newName : $this->getName();
         $this->emitBeforeNodeMove($this, $referenceNode, NodeDataRepository::POSITION_LAST);
@@ -716,15 +785,27 @@ class Node implements NodeInterface, CacheAwareInterface
             throw new NodeConstraintException('Cannot copy ' . $this->__toString() . ' before ' . $referenceNode->__toString(), 1402050232);
         }
 
+        $identifier = $this->generateIdentifierForCopyOperation($referenceNode);
+        $this->recordThat(new NodeCopiedBefore($identifier, $referenceNode->getIdentifier(), $nodeName));
+        $this->commit();
+
+        return $this->context->getNodeByIdentifier($identifier);
+    }
+
+    /**
+     * @param NodeCopiedBefore $event
+     */
+    protected function whenNodeCopiedBefore(NodeCopiedBefore $event)
+    {
+        $referenceNode = $this->context->getNodeByIdentifier($event->getReferenceNode());
+
         $this->emitBeforeNodeCopy($this, $referenceNode->getParent());
-        $copiedNode = $this->createRecursiveCopy($referenceNode->getParent(), $nodeName, $this->getNodeType()->isAggregate());
+        $copiedNode = $this->createRecursiveCopy($referenceNode->getParent(), $event->getNodeName(), $this->getNodeType()->isAggregate(), $event->getIdentifier());
         $copiedNode->moveBefore($referenceNode);
 
         $this->context->getFirstLevelNodeCache()->flush();
         $this->emitNodeAdded($copiedNode);
         $this->emitAfterNodeCopy($copiedNode, $referenceNode->getParent());
-
-        return $copiedNode;
     }
 
     /**
@@ -767,15 +848,26 @@ class Node implements NodeInterface, CacheAwareInterface
             throw new NodeConstraintException('Cannot copy ' . $this->__toString() . ' after ' . $referenceNode->__toString(), 1404648170);
         }
 
+        $identifier = $this->generateIdentifierForCopyOperation($referenceNode);
+        $this->recordThat(new NodeCopiedAfter($identifier, $referenceNode->getIdentifier(), $nodeName));
+        $this->commit();
+
+        return $this->context->getNodeByIdentifier($identifier);
+    }
+
+    /**
+     * @param NodeCopiedAfter $event
+     */
+    protected function whenNodeCopiedAfter(NodeCopiedAfter $event)
+    {
+        $referenceNode = $this->context->getNodeByIdentifier($event->getReferenceNode());
         $this->emitBeforeNodeCopy($this, $referenceNode->getParent());
-        $copiedNode = $this->createRecursiveCopy($referenceNode->getParent(), $nodeName, $this->getNodeType()->isAggregate());
+        $copiedNode = $this->createRecursiveCopy($referenceNode->getParent(), $event->getNodeName(), $this->getNodeType()->isAggregate(), $event->getIdentifier());
         $copiedNode->moveAfter($referenceNode);
 
         $this->context->getFirstLevelNodeCache()->flush();
         $this->emitNodeAdded($copiedNode);
         $this->emitAfterNodeCopy($copiedNode, $referenceNode->getParent());
-
-        return $copiedNode;
     }
 
     /**
@@ -790,11 +882,21 @@ class Node implements NodeInterface, CacheAwareInterface
      */
     public function copyInto(NodeInterface $referenceNode, $nodeName)
     {
-        $this->emitBeforeNodeCopy($this, $referenceNode);
-        $copiedNode = $this->copyIntoInternal($referenceNode, $nodeName, $this->getNodeType()->isAggregate());
-        $this->emitAfterNodeCopy($this, $referenceNode);
+        $identifier = $this->generateIdentifierForCopyOperation($referenceNode);
+        $this->recordThat(new NodeCopiedInto($identifier, $referenceNode->getIdentifier(), $nodeName));
+        $this->commit();
+        return $this->context->getNodeByIdentifier($identifier);
+    }
 
-        return $copiedNode;
+    /**
+     * @param NodeCopiedInto $event
+     */
+    protected function whenNodeCopiedInto(NodeCopiedInto $event)
+    {
+        $referenceNode = $this->context->getNodeByIdentifier($event->getReferenceNode());
+        $this->emitBeforeNodeCopy($this, $referenceNode);
+        $this->copyIntoInternal($referenceNode, $event->getNodeName(), $this->getNodeType()->isAggregate(), $event->getIdentifier());
+        $this->emitAfterNodeCopy($this, $referenceNode);
     }
 
     /**
@@ -805,11 +907,12 @@ class Node implements NodeInterface, CacheAwareInterface
      * @param NodeInterface $referenceNode
      * @param $nodeName
      * @param boolean $detachedCopy
+     * @param string $identifier
      * @return NodeInterface
      * @throws NodeConstraintException
      * @throws NodeExistsException
      */
-    protected function copyIntoInternal(NodeInterface $referenceNode, $nodeName, $detachedCopy)
+    protected function copyIntoInternal(NodeInterface $referenceNode, $nodeName, $detachedCopy, $identifier)
     {
         if ($referenceNode->getNode($nodeName) !== null) {
             throw new NodeExistsException('Node with path "' . $referenceNode->getPath() . '/' . $nodeName . '" already exists.', 1292503467);
@@ -821,7 +924,7 @@ class Node implements NodeInterface, CacheAwareInterface
             throw new NodeConstraintException(sprintf('Cannot copy "%s" into "%s" due to node type constraints.', $this->__toString(), $referenceNode->__toString()), 1404648177);
         }
 
-        $copiedNode = $this->createRecursiveCopy($referenceNode, $nodeName, $detachedCopy);
+        $copiedNode = $this->createRecursiveCopy($referenceNode, $nodeName, $detachedCopy, $identifier);
 
         $this->context->getFirstLevelNodeCache()->flush();
 
@@ -847,10 +950,24 @@ class Node implements NodeInterface, CacheAwareInterface
             $this->materializeNodeData();
         }
         // Arrays could potentially contain entities and objects could be entities. In that case even if the object is the same it needs to be persisted in NodeData.
-        if (!is_object($value) && !is_array($value) && $this->getProperty($propertyName) === $value) {
+        $oldValue = $this->hasProperty($propertyName) ? $this->getProperty($propertyName) : null;
+        if (!is_object($value) && !is_array($value) && $oldValue === $value) {
             return;
         }
-        $oldValue = $this->hasProperty($propertyName) ? $this->getProperty($propertyName) : null;
+
+        $this->recordThat(new NodePropertyUpdated($propertyName, $value, $this->getProperty($propertyName, true)));
+        $this->commit();
+
+    }
+
+    /**
+     * @param NodePropertyUpdated $event
+     */
+    protected function whenNodePropertyUpdated(NodePropertyUpdated $event)
+    {
+        $propertyName = $event->getPropertyName();
+        $oldValue = $this->getProperty($propertyName);
+        $value = $event->getValue();
         $this->emitBeforeNodePropertyChange($this, $propertyName, $oldValue, $value);
         $this->nodeData->setProperty($propertyName, $value);
 
@@ -1072,10 +1189,21 @@ class Node implements NodeInterface, CacheAwareInterface
      */
     public function createNode($name, NodeType $nodeType = null, $identifier = null)
     {
-        $this->emitBeforeNodeCreate($this, $name, $nodeType, $identifier);
-        $newNode = $this->createSingleNode($name, $nodeType, $identifier);
-        if ($nodeType !== null) {
-            foreach ($nodeType->getDefaultValuesForProperties() as $propertyName => $propertyValue) {
+        $identifier = $identifier ?: Algorithms::generateUUID();
+        $this->recordThat(new NodeCreated($name, $nodeType, $identifier));
+        $this->eventStreamService->commit('Node-' . $identifier . '@' . $this->getContext()->getWorkspaceName(), Node::class, ...$this->events);
+        return $this->getContext()->getNodeByIdentifier($identifier);
+    }
+
+    /**
+     * @param NodeCreated $event
+     */
+    protected function whenNodeCreated(NodeCreated $event)
+    {
+        $this->emitBeforeNodeCreate($this, $event->getName(), $event->getNodeType(), $event->getIdentifier());
+        $newNode = $this->createSingleNode($event->getName(), $event->getNodeType(), $event->getIdentifier());
+        if ($event->getNodeType() !== null) {
+            foreach ($event->getNodeType()->getDefaultValuesForProperties() as $propertyName => $propertyValue) {
                 if (substr($propertyName, 0, 1) === '_') {
                     ObjectAccess::setProperty($newNode, substr($propertyName, 1), $propertyValue);
                 } else {
@@ -1083,7 +1211,7 @@ class Node implements NodeInterface, CacheAwareInterface
                 }
             }
 
-            foreach ($nodeType->getAutoCreatedChildNodes() as $childNodeName => $childNodeType) {
+            foreach ($event->getNodeType()->getAutoCreatedChildNodes() as $childNodeName => $childNodeType) {
                 $childNodeIdentifier = Utility::buildAutoCreatedChildNodeIdentifier($childNodeName, $newNode->getIdentifier());
                 $alreadyPresentChildNode = $newNode->getNode($childNodeName);
                 if ($alreadyPresentChildNode === null) {
@@ -1095,8 +1223,6 @@ class Node implements NodeInterface, CacheAwareInterface
         $this->context->getFirstLevelNodeCache()->flush();
         $this->emitNodeAdded($newNode);
         $this->emitAfterNodeCreate($newNode);
-
-        return $newNode;
     }
 
     /**
@@ -1269,21 +1395,42 @@ class Node implements NodeInterface, CacheAwareInterface
         if (!$this->isNodeDataMatchingContext()) {
             $this->materializeNodeData();
         }
+        if ($removed === $this->nodeData->isRemoved()) {
+            return;
+        }
 
         if ((boolean)$removed === true) {
-            /** @var $childNode Node */
-            foreach ($this->getChildNodes() as $childNode) {
-                $childNode->setRemoved(true);
-            }
-
-            $this->nodeData->setRemoved(true);
-            $this->emitNodeRemoved($this);
+            $this->recordThat(new NodeRemoved($this->getIdentifier()));
+            $this->commit();
         } else {
-            $this->nodeData->setRemoved(false);
-            $this->emitNodeUpdated($this);
+            $this->recordThat(new NodeRestored($this->getIdentifier()));
+            $this->commit();
         }
 
         $this->context->getFirstLevelNodeCache()->flush();
+    }
+
+    /**
+     * @param NodeRemoved $event
+     */
+    protected function whenNodeRemoved(NodeRemoved $event)
+    {
+        /** @var $childNode Node */
+        foreach ($this->getChildNodes() as $childNode) {
+            $childNode->setRemoved(true);
+        }
+
+        $this->nodeData->setRemoved(true);
+        $this->emitNodeRemoved($this);
+    }
+
+    /**
+     * @param NodeRestored $event
+     */
+    protected function whenNodeRestored(NodeRestored $event)
+    {
+        $this->nodeData->setRemoved(false);
+        $this->emitNodeUpdated($this);
     }
 
     /**
@@ -1560,22 +1707,11 @@ class Node implements NodeInterface, CacheAwareInterface
      * @param NodeInterface $referenceNode
      * @param boolean $detachedCopy
      * @param string $nodeName
+     * @param string $identifier
      * @return NodeInterface
      */
-    protected function createRecursiveCopy(NodeInterface $referenceNode, $nodeName, $detachedCopy)
+    protected function createRecursiveCopy(NodeInterface $referenceNode, $nodeName, $detachedCopy, $identifier)
     {
-        $identifier = null;
-
-        $referenceNodeDimensions = $referenceNode->getDimensions();
-        $referenceNodeDimensionsHash = Utility::sortDimensionValueArrayAndReturnDimensionsHash($referenceNodeDimensions);
-        $thisDimensions = $this->getDimensions();
-        $thisNodeDimensionsHash = Utility::sortDimensionValueArrayAndReturnDimensionsHash($thisDimensions);
-        if ($detachedCopy === false && $referenceNodeDimensionsHash !== $thisNodeDimensionsHash && $referenceNode->getContext()->getNodeByIdentifier($this->getIdentifier()) === null) {
-            // If the target dimensions are different than this one, and there is no node shadowing this one in the target dimension yet, we use the same
-            // node identifier, effectively creating a new node variant.
-            $identifier = $this->getIdentifier();
-        }
-
         $copiedNode = $referenceNode->createSingleNode($nodeName, null, $identifier);
 
         $copiedNode->similarize($this, true);
@@ -1588,6 +1724,25 @@ class Node implements NodeInterface, CacheAwareInterface
         }
 
         return $copiedNode;
+    }
+
+    /**
+     * @param NodeInterface $referenceNode
+     * @return string
+     */
+    protected function generateIdentifierForCopyOperation(NodeInterface $referenceNode)
+    {
+        $detachedCopy = $this->getNodeType()->isAggregate();
+        $referenceNodeDimensions = $referenceNode->getDimensions();
+        $referenceNodeDimensionsHash = Utility::sortDimensionValueArrayAndReturnDimensionsHash($referenceNodeDimensions);
+        $thisDimensions = $this->getDimensions();
+        $thisNodeDimensionsHash = Utility::sortDimensionValueArrayAndReturnDimensionsHash($thisDimensions);
+        if ($detachedCopy === false && $referenceNodeDimensionsHash !== $thisNodeDimensionsHash && $referenceNode->getContext()->getNodeByIdentifier($this->getIdentifier()) === null) {
+            // If the target dimensions are different than this one, and there is no node shadowing this one in the target dimension yet, we use the same
+            // node identifier, effectively creating a new node variant.
+            return $this->getIdentifier();
+        }
+        return Algorithms::generateUUID();
     }
 
     /**
@@ -1784,6 +1939,22 @@ class Node implements NodeInterface, CacheAwareInterface
         }
 
         return false;
+    }
+
+    /**
+     * @return string
+     */
+    public function getAggregateIdentifier(): string
+    {
+        return 'Node-' . $this->getIdentifier() . '@' . $this->getWorkspace()->getName();
+    }
+
+    /**
+     * @param string $identifier
+     */
+    protected function commit(string $identifier = null)
+    {
+        $this->eventStreamService->commit($identifier ? 'Node-' . $identifier : $this->getAggregateIdentifier(), Node::class, ...$this->events);
     }
 
     /**
