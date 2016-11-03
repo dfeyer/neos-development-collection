@@ -11,6 +11,8 @@ namespace TYPO3\TYPO3CR\Domain\Model;
  * source code.
  */
 
+use TYPO3\Eel\EelEvaluatorInterface;
+use TYPO3\Eel\Exception;
 use TYPO3\Eel\Utility;
 use TYPO3\Flow\Annotations as Flow;
 use TYPO3\Flow\Object\DependencyInjection\DependencyProxy;
@@ -24,7 +26,7 @@ class ExpressionBasedNodeLabelGenerator implements NodeLabelGeneratorInterface
 {
     /**
      * @Flow\Inject
-     * @var \TYPO3\Eel\EelEvaluatorInterface
+     * @var EelEvaluatorInterface
      */
     protected $eelEvaluator;
 
@@ -71,6 +73,7 @@ class ExpressionBasedNodeLabelGenerator implements NodeLabelGeneratorInterface
      * @param NodeInterface $node
      * @param boolean $crop This argument is deprecated as of Neos 1.2 and will be removed. Don't rely on this behavior and crop labels in the view.
      * @return string
+     * @throws Exception
      */
     public function getLabel(NodeInterface $node, $crop = true)
     {
@@ -80,13 +83,16 @@ class ExpressionBasedNodeLabelGenerator implements NodeLabelGeneratorInterface
             $property = 'childNodes.' . $node->getName() . '.label';
             if ($parentNode->getNodeType()->hasConfiguration($property)) {
                 $labelConfiguration = $parentNode->getNodeType()->getConfiguration($property);
-                if (!Utility::extractEelExpression($labelConfiguration)) {
-                    $label = (string)$labelConfiguration;
-                } else {
+                try {
                     $label = Utility::evaluateEelExpression($labelConfiguration, $this->eelEvaluator, [
                         'node' => $node,
                         'parentNode' => $parentNode
                     ], $this->defaultContextConfiguration);
+                } catch (Exception $exception) {
+                    if ($exception->getCode() !== 1410441849) {
+                        throw $exception;
+                    }
+                    $label = (string)$labelConfiguration;
                 }
             }
         }
