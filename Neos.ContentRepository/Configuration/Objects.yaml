@@ -26,3 +26,13 @@
         arguments:
           1:
             value: Neos_ContentRepository_FullNodeTypeConfiguration
+
+'Neos\ContentRepository\Domain\Service\Cache\UniqueNodePropertyCache':
+  properties:
+    cache:
+      object:
+        factoryObjectName: Neos\Flow\Cache\CacheManager
+        factoryMethodName: getCache
+        arguments:
+          1:
+            value: Neos_ContentRepository_UniqueNodeProperty

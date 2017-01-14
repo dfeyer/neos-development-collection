@@ -11,15 +11,17 @@ namespace Neos\Neos\Service\View;
  * source code.
  */
 
-use Neos\Flow\Annotations as Flow;
+use Neos\ContentRepository\Domain\Model\NodeInterface;
+use Neos\ContentRepository\Domain\Model\UniqueNodeName;
+use Neos\ContentRepository\Domain\Model\UniqueNodeUriPathSegment;
+use Neos\ContentRepository\Security\Authorization\Privilege\Node\NodePrivilegeSubject;
 use Neos\Eel\FlowQuery\FlowQuery;
+use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Log\SystemLoggerInterface;
 use Neos\Flow\Mvc\View\JsonView;
 use Neos\Flow\Security\Authorization\PrivilegeManagerInterface;
 use Neos\Neos\Security\Authorization\Privilege\NodeTreePrivilege;
-use Neos\ContentRepository\Domain\Model\NodeInterface;
 use Neos\Utility\Arrays;
-use Neos\ContentRepository\Security\Authorization\Privilege\Node\NodePrivilegeSubject;
 
 /**
  * An View specialized on single or multiple Nodes in a tree structure
@@ -323,6 +325,8 @@ class NodeView extends JsonView
             'isLazy' => ($hasChildNodes && !$expand),
             'nodeType' => $nodeType->getName(),
             'isAutoCreated' => $node->isAutoCreated(),
+            'uniqueUriPathSegment' => (string)(new UniqueNodeUriPathSegment($node)),
+            'uniqueName' => (string)(new UniqueNodeName($node)),
             'expand' => $expand,
             'addClass' => implode(' ', $classes),
             'name' => $node->getName(),
