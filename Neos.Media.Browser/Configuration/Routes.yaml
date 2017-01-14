@@ -1,6 +1,15 @@
 #                                                                        #
 # Default subroutes configuration for the Neos.Media.Browser package      #
 #                                                                        #
+-
+  name: 'Content Module - Asset Usage'
+  uriPattern: 'usage(/{@action}).{@format}'
+  defaults:
+    '@package':    'Neos.Media.Browser'
+    '@controller': 'Module\Management\AssetUsage'
+    '@format': 'html'
+    '@action': 'relatedNodes'
+  appendExceedingArguments: TRUE
 
 -
   name: 'Content Module - Media Browser'

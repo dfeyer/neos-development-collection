@@ -12,7 +12,6 @@ namespace Neos\Media\Browser\Controller\Module\Management;
  */
 
 use Neos\ContentRepository\Domain\Factory\NodeFactory;
-use Neos\ContentRepository\Domain\Model\NodeInterface;
 use Neos\ContentRepository\Domain\Repository\WorkspaceRepository;
 use Neos\Error\Messages\Error;
 use Neos\Error\Messages\Message;
@@ -25,12 +24,9 @@ use Neos\Media\Domain\Model\AssetCollection;
 use Neos\Media\Domain\Model\AssetInterface;
 use Neos\Neos\Controller\BackendUserTranslationTrait;
 use Neos\Neos\Controller\CreateContentContextTrait;
-use Neos\Neos\Domain\Model\Dto\AssetUsageInNodeProperties;
 use Neos\Neos\Domain\Repository\DomainRepository;
 use Neos\Neos\Domain\Repository\SiteRepository;
-use Neos\Neos\Domain\Service\ContentDimensionPresetSourceInterface;
 use Neos\Neos\Domain\Service\UserService as DomainUserService;
-use Neos\Neos\Service\UserService;
 use Neos\Utility\MediaTypes;
 
 /**
@@ -87,21 +83,9 @@ class AssetController extends \Neos\Media\Browser\Controller\AssetController
 
     /**
      * @Flow\Inject
-     * @var UserService
-     */
-    protected $userService;
-
-    /**
-     * @Flow\Inject
      * @var DomainUserService
      */
     protected $domainUserService;
-
-    /**
-     * @Flow\Inject
-     * @var ContentDimensionPresetSourceInterface
-     */
-    protected $contentDimensionPresetSource;
 
     /**
      * @return void
@@ -163,41 +147,6 @@ class AssetController extends \Neos\Media\Browser\Controller\AssetController
         }
 
         parent::updateAssetResourceAction($asset, $resource, $options);
-    }
-
-    /**
-     * Get Related Nodes for an asset
-     *
-     * @param AssetInterface $asset
-     * @return void
-     */
-    public function relatedNodesAction(AssetInterface $asset)
-    {
-        $userWorkspace = $this->userService->getPersonalWorkspace();
-
-        $usageReferences = $this->assetService->getUsageReferences($asset);
-        $relatedNodes = [];
-
-        /** @var AssetUsageInNodeProperties $usage */
-        foreach ($usageReferences as $usage) {
-            $documentNodeIdentifier = $usage->getDocumentNode() instanceof NodeInterface ? $usage->getDocumentNode()->getIdentifier() : null;
-
-            $relatedNodes[$usage->getSite()->getNodeName()]['site'] = $usage->getSite();
-            $relatedNodes[$usage->getSite()->getNodeName()]['documentNodes'][$documentNodeIdentifier]['node'] = $usage->getDocumentNode();
-            $relatedNodes[$usage->getSite()->getNodeName()]['documentNodes'][$documentNodeIdentifier]['nodes'][] = [
-                'node' => $usage->getNode(),
-                'nodeData' => $usage->getNode()->getNodeData(),
-                'contextDocumentNode' => $usage->getDocumentNode(),
-                'accessible' => $usage->isAccessible()
-            ];
-        }
-
-        $this->view->assignMultiple([
-            'asset' => $asset,
-            'relatedNodes' => $relatedNodes,
-            'contentDimensions' => $this->contentDimensionPresetSource->getAllPresets(),
-            'userWorkspace' => $userWorkspace
-        ]);
     }
 
     /**

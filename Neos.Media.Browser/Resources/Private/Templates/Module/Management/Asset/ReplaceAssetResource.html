@@ -38,7 +38,7 @@
                     <f:if condition="{asset.inUse}">
                         <f:then>
                             <p class="neos-buffer-below"><i class="icon-exclamation-sign"></i> {neos:backend.translate(id: 'media.replace.usageCount', arguments: {usageCount: asset.usageCount}, source: 'Modules', package: 'Neos.Neos')}</p>
-                            <f:link.action action="relatedNodes" arguments="{asset:asset}" class="neos-button">
+                            <f:link.action controller="Module\Management\AssetUsage" action="relatedNodes" arguments="{asset:asset}" class="neos-button">
                                 {neos:backend.translate(id: 'media.replace.allUsages', source: 'Modules', package: 'Neos.Neos')}
                             </f:link.action>
                         </f:then>

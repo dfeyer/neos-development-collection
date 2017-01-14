@@ -90,7 +90,12 @@ class BackendModuleRoutePartHandler extends DynamicRoutePart
                         break;
                     }
                 }
-                return self::MATCHRESULT_NOSUCHMODULE;
+                if (!is_array($moduleConfiguration['actionMapping']) || !isset($moduleConfiguration['actionMapping'][$segment])) {
+                    return self::MATCHRESULT_NOSUCHMODULE;
+                } else {
+                    $moduleController = $moduleConfiguration['actionMapping'][$segment];
+                    $moduleAction = $segment;
+                }
             }
             $level++;
         }
@@ -98,6 +103,7 @@ class BackendModuleRoutePartHandler extends DynamicRoutePart
         if ($moduleController === null) {
             return self::MATCHRESULT_NOCONTROLLER;
         }
+
 
         $this->value = array(
             'module' => implode('/', $modulePath),

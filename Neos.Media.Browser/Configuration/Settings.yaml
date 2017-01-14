@@ -43,6 +43,8 @@ Neos:
           media:
             label: 'Neos.Media.Browser:Modules:media.label'
             controller: \Neos\Media\Browser\Controller\Module\Management\AssetController
+            actionMapping:
+              relatednodes: \Neos\Media\Browser\Controller\Module\Management\AssetUsageController
             description: 'Neos.Media.Browser:Modules:media.description'
             icon: icon-camera
             privilegeTarget: 'Neos.Media.Browser:ManageAssets'

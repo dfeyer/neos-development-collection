@@ -15,6 +15,9 @@ privilegeTargets:
     'Neos.Media.Browser:Backend.Module.Media.ManageAssets':
       matcher: 'method(Neos\Media\Browser\Controller\(Module\Management\Asset|Backend\MediaBrowser|Backend\ImageBrowser)Controller->(index|new|edit|update|initializeCreate|create|initializeUpload|upload|tagAsset|delete|createTag|editTag|updateTag|deleteTag|addAssetToCollection|relatedNodes)Action())'
 
+    'Neos.Media.Browser:Backend.Module.Media.ManageAssetUsages':
+      matcher: 'method(Neos\Media\Browser\Controller\Module\Management\AssetUsageController->relatedNodesAction())'
+
     'Neos.Media.Browser:Backend.Module.Media.ManageAssetCollections':
       matcher: 'method(Neos\Media\Browser\Controller\(Module\Management\Asset|Backend\MediaBrowser|Backend\ImageBrowser)Controller->(createAssetCollection|editAssetCollection|updateAssetCollection|deleteAssetCollection)Action())'
 
@@ -32,6 +35,10 @@ roles:
 
       -
         privilegeTarget: 'Neos.Media.Browser:Backend.Module.Media.ManageAssets'
+        permission: GRANT
+
+      -
+        privilegeTarget: 'Neos.Media.Browser:Backend.Module.Media.ManageAssetUsages'
         permission: GRANT
 
   'Neos.Neos:LivePublisher':
