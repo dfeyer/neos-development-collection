@@ -76,7 +76,7 @@ class ExpressionBasedNodeLabelGenerator implements NodeLabelGeneratorInterface
     public function getLabel(NodeInterface $node)
     {
         $label = null;
-        if ($node->getNodeType()->isOfType('TYPO3.Neos:ContentCollection') && $node->isAutoCreated()) {
+        if ($node->isAutoCreated()) {
             $parentNode = $node->getParent();
             $property = 'childNodes.' . $node->getName() . '.label';
             if ($parentNode->getNodeType()->hasConfiguration($property)) {
