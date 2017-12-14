@@ -160,6 +160,8 @@ class ImageService
         
         $additionalOptions = $this->getOptionsMergedWithDefaults($additionalOptions);
 
+        $additionalOptions = $this->getOptionsMergedWithDefaults($additionalOptions);
+
         if ($adjustmentsApplied === true) {
             $interlace = Arrays::getValueByPath($this->settings, 'image.defaultOptions.interlace');
             if ($interlace !== null) {
